@@ -8,10 +8,9 @@
 		.box {
 			width: 70px;
 			height: 70px;
-			background-color: teal;
+			background-color: rgb(244, 115, 18);
 			font-size: 300%;
 			text-align: center;
-			user-select: none;
 			display: block;
 			position: absolute;
 			top: 100px;
@@ -40,16 +39,18 @@
 			var box = jQuery('.box');	// reference to the HTML .box element
 			var board = jQuery('.board');	// reference to the HTML .board element
 			var boardWidth = board.width();	// the maximum X-Coordinate of the screen
+			var boardHeight = board.height(); // max Y-Coordinate of the screen
 
-			// Every 50 milliseconds, call the update Function (see below)
-			setInterval(update, 50);
+			// Every 2 milliseconds, call the update Function (see below)
+			setInterval(update, 2);
 			
 			// Every time the box is clicked, call the handleBoxClick Function (see below)
 			box.on('click', handleBoxClick);
 
 			// moves the Box to a new position on the screen along the X-Axis
-			function moveBoxTo(newPositionX) {
+			function moveBoxTo(newPositionX, newPositionY) {
 				box.css("left", newPositionX);
+				box.css('top', newPositionY);
 			}
 
 			// changes the text displayed on the Box
@@ -57,12 +58,33 @@
 				box.text(newText);
 			}
 
+			function changeBoxColor(color) {
+				box.css('background-color', color);
+			}
+
+			function pickRandomColor() {
+				return `rgb(${getRandomInt(256)}, ${getRandomInt(256)}, ${getRandomInt(256)})`;
+			}
+
+			function getRandomInt(max) {
+				return Math.floor(Math.random() * max);
+			}
+
+			function reverse(num) {
+				return -num;
+			}
+
 			//////////////////////////////////////////////////////////////////
 			/////////////////// YOUR CODE BELOW HERE /////////////////////////
 			//////////////////////////////////////////////////////////////////
 			
 			// TODO 2 - Variable declarations 
-			
+			var pos = { x: 0, y: getRandomInt(100) + 200 };
+			var score = 0;
+			var counter = 0;
+			var randInterval = getRandomInt(40) + 10;
+			var speed = { x: getRandomInt(5) + 5, y: getRandomInt(4) + 4 };
+			var adjuster = { x: getRandomInt(4) + 2, y: getRandomInt(2) + 3 };
 
 			
 			/* 
@@ -71,7 +93,24 @@
 			turn it around! 
 			*/
 			function update() {
-				
+				counter++;
+				if (!(counter % randInterval)) {
+					changeBoxColor(pickRandomColor());
+				}
+				pos.x += speed.x;
+				pos.y += speed.y;
+				moveBoxTo(pos.x, pos.y);
+				if (pos.x > boardWidth || pos.x < 0) {
+					speed.x = reverse(speed.x);
+				}
+				if (pos.y > boardHeight) {
+					pos.y = boardHeight;
+					speed.y = reverse(speed.y);
+				}
+				else if (pos.y < 0) {
+					pos.y = 0;
+					speed.y = reverse(speed.y);
+				}
 
 			};
 
@@ -81,8 +120,25 @@
 			the left side of the screen.
 			*/
 			function handleBoxClick() {
-				
+				pos.x = 0;
+				pos.y = getRandomInt(2) ? pos.y - getRandomInt(250) : pos.y + getRandomInt(250);
+				score++;
 
+				changeBoxText(score);
+
+				// adjust x speed when clicked
+				if (speed.x > 0) {
+					speed.x += adjuster.x;
+				} else {
+					speed.x -= adjuster.x;
+				}
+
+				// adjust y speed when clicked
+				if (speed.y > 0) {
+					speed.y += adjuster.y;
+				} else {
+					speed.y -= adjuster.y;
+				}
 
 			};
 		})();

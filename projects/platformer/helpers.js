@@ -3,284 +3,72 @@
 ///////////////////////////////////////////////
 // Core functionality /////////////////////////
 ///////////////////////////////////////////////
-function registerSetup(setup) {
-  setupGame = setup;
-}
-
-function main() {
-  ctx.clearRect(0, 0, 1400, 750); //erase the screen so you can draw everything in it's most current position
-
-  if (player.deadAndDeathAnimationDone) {
-    deathOfPlayer();
-    return;
+/* global Phaser */
+$(document).ready(function () {
+  'use strict';
+  window.opspark = window.opspark || {};
+  let 
+      opspark = window.opspark,
+      game = opspark.createGame(create, update),
+      lives = 3;
+      
+  function create() {
+      game.opspark.init();
+      
+      opspark.platform.factory(game);
+      opspark.platform.init(game);
+      
+      opspark.collectable.factory(game);
+      opspark.collectable.init(game);
+      
+      opspark.cannon.factory(game);
+      opspark.cannon.init(game);
+      
+      opspark.player.init(game);
+      
+      const textOpts = { fontSize: '32px', fill: '#000' };
+      game.score = game.add.text(16, 16, 'Score: 0', textOpts);
+      game.lives = game.add.text(16, 70, 'Lives: ' + lives, textOpts);
   }
 
-  drawPlatforms();
-  drawProjectiles();
-  drawCannons();
-  drawCollectables();
-  playerFrictionAndGravity();
 
-  player.x += player.speedX;
-  player.y += player.speedY;
-
-  collision(); //checks if the player will collide with something in this frame
-  keyboardControlActions(); //keyboard controls.
-  projectileCollision(); //checks if the player is getting hit by a projectile in the next frame
-  collectablesCollide(); //checks if player has touched a collectable
-
-  animate(); //this changes halle's picture to the next frame so it looks animated.
-  // debug()                   //debugging values. Comment this out when not debugging.
-  drawRobot(); //this actually displays the image of the robot.
-}
-
-function getJSON(url, callback) {
-  var xhr = new XMLHttpRequest();
-  xhr.open("GET", url, true);
-  xhr.responseType = "json";
-  xhr.onload = function () {
-    var status = xhr.status;
-    if (status === 200) {
-      callback(null, xhr.response);
-      setupGame();
-    } else {
-      callback(status, xhr.response);
-    }
-  };
-  xhr.send();
-}
-
-function JsonFunction(status, response) {
-  /*
-      diagram of the json
-      top level is the name of the animation
-      also don't you dare complain, this is operation sparks fault for making the animation so complicated.
-      animation name{
-          coordinates{
-              sx: xpadding,
-              sy: ypadding,
-              width: cords.swidth,
-              height: cords.sheight,
-              hitWidth: 50, //cords.width,
-              hitHeight: 105,//cords.height,
-              hitDx: 0,
-              hitDy: 0,
-              xoffset: xoffset,
-              yoffset: yoffset,
-          }
-          maxHeight: largest size the sprite can be
-          maxWidth: 
-      }
-    */
-  animationDetails = response;
-}
-
-///////////////////////////////////////////////
-// Helper functions ///////////////////////////
-///////////////////////////////////////////////
-
-function changeAnimationType() {
-  if (currentAnimationType === animationTypes.frontDeath) {
-    if (
-      frameIndex >= animationDetails[currentAnimationType].coordinates.length
-    ) {
-      player.deadAndDeathAnimationDone = true;
-    }
-    return;
+  function update() {
+      const asset = game.player.asset,
+            playerManager = game.playerManager,
+            collectable = game.collectable;
+      
+      game.physics.arcade.collide(asset, game.platforms);
+      game.physics.arcade.collide(asset, game.projectile);
+      game.physics.arcade.collide(collectable, game.platforms);
+      game.physics.arcade.overlap(asset, collectable, collectDb, null, this);
+      game.physics.arcade.overlap(asset, game.projectile, onProjectileOverlap, null, this);
+      
+      playerManager.update();
   }
-  if (jumpTimer > 0 && !player.onGround) {
-    currentAnimationType = animationTypes.jump;
-    jumpTimer--;
-  } else {
-    jumpTimer = 0;
-    if (Math.abs(player.speedX) > 0) {
-      //if you're moving then change animation to walking or running
-      if (keyPress.left || keyPress.right) {
-        currentAnimationType = animationTypes.run;
+
+  function onProjectileOverlap() {
+      console.log('Halle hit!');
+      game.player.die();
+      decrementLives();
+      if(lives > 0){
+          opspark.player.init(game);
+      } 
+  }
+  function decrementLives(){
+      if(lives !== 0){
+          lives--;
+          game.lives.text = 'Lives ' + lives;            
       } else {
-        currentAnimationType = animationTypes.walk;
-      }
-    } else if (player.onGround) {
-      if (keyPress.down) {
-        currentAnimationType = animationTypes.duck;
-        if (duckTimer < DUCK_COUNTER_IDLE_VALUE) {
-          // not using index 0 because the animation is too slow then
-          frameIndex = 3;
-          duckTimer = DUCK_COUNTER_IDLE_VALUE * 2 - frameIndex;
-        }
-      } else if (
-        duckTimer === 0 ||
-        currentAnimationType === animationTypes.walk
-      ) {
-        currentAnimationType = animationTypes.frontIdle;
-      }
-    }
-  }
-}
-
-function debug() {
-  debugVar = true;
-
-  ctx.fillText("xs" + player.speedX + " x: " + player.x, 500, 200);
-  ctx.fillText("ys" + player.speedY + " y: " + player.y, 500, 250);
-
-  ctx.fillStyle = "black";
-  ctx.fillText("on ground " + player.onGround, 150 + player.x, player.y - 20);
-  ctx.fillText("hitx" + hitDx, 150 + player.x, player.y);
-  ctx.fillText("hity" + hitDy, 150 + player.x, player.y + 20);
-  ctx.fillText("offsetx" + offsetX, 150 + player.x, player.y + 40);
-  ctx.fillText("offsetY" + offsetY, 150 + player.x, player.y + 60);
-
-  ctx.fillStyle = "grey";
-  ctx.fillRect(player.x, player.y, player.width, player.height);
-
-  //debug showing collision
-  ctx.fillStyle = "yellow";
-  ctx.fillRect(500, 100, 50, 50);
-
-  ctx.fillStyle = "green";
-  ctx.fillRect(player.x, player.y, hitBoxWidth, hitBoxHeight);
-
-  if (collision() !== undefined) {
-    ctx.fillStyle = "yellow";
-    ctx.fillRect(player.x, player.y - 50, 10, 10);
-  }
-}
-
-function animate() {
-  if (
-    !(
-      keyPress.down &&
-      duckTimer === DUCK_COUNTER_IDLE_VALUE &&
-      currentAnimationType === animationTypes.duck
-    )
-  ) {
-    frameIndex = frameIndex + 15 / frameRate;
-    if (duckTimer > 0) {
-      duckTimer -= 0.25;
-    }
-  }
-  changeAnimationType();
-  if (frameIndex >= animationDetails[currentAnimationType].coordinates.length) {
-    frameIndex = 0;
-  }
-  spriteX =
-    animationDetails[currentAnimationType].coordinates[Math.floor(frameIndex)]
-      .sx;
-  spriteY =
-    animationDetails[currentAnimationType].coordinates[Math.floor(frameIndex)]
-      .sy;
-  spriteWidth =
-    animationDetails[currentAnimationType].coordinates[Math.floor(frameIndex)]
-      .width;
-  spriteHeight =
-    animationDetails[currentAnimationType].coordinates[Math.floor(frameIndex)]
-      .height;
-  maxWidth = animationDetails[currentAnimationType].maxWidth * playerScale;
-  maxHeight = animationDetails[currentAnimationType].maxHeight * playerScale;
-  offsetX =
-    animationDetails[currentAnimationType].coordinates[Math.floor(frameIndex)]
-      .xoffset * playerScale;
-  offsetY =
-    animationDetails[currentAnimationType].coordinates[Math.floor(frameIndex)]
-      .yoffset * playerScale;
-  player.width =
-    animationDetails[currentAnimationType].coordinates[Math.floor(frameIndex)]
-      .width * playerScale;
-  player.height =
-    animationDetails[currentAnimationType].coordinates[Math.floor(frameIndex)]
-      .height * playerScale;
-  hitDx =
-    animationDetails[currentAnimationType].coordinates[Math.floor(frameIndex)]
-      .hitDx * playerScale;
-  hitDy =
-    animationDetails[currentAnimationType].coordinates[Math.floor(frameIndex)]
-      .hitDy * playerScale;
-}
-
-function drawRobot() {
-  //ctx.drawImage(imageVaribale, sourceY, SourceX, sourceWidth, sourceHeight, canvasX, canvasY, finalWidth, finalHeight)
-  //https://developer.mozilla.org/en-US/docs/Web/API/CanvasRenderingContext2D/drawImage
-  //you only need the extra four source arguments if you want to display just a portion of the picture; if you want to show the whole picture you can just do drawImage(imageVar, canvasX, canvasY, width, height)
-
-  //next section draws hallie. There is an if so that the image is reversed based on the direction of travel
-  //there is also a hitDx and hitDy; those are offsets for the animation; enable debugger to see the true hitbox in green
-  //you can enable the debug view by uncommenting the debug() function call in the main function.
-  if (player.deadAndDeathAnimationDone) {
-    return; //return stops the function, we don't want to draw the robot after we die
+          setTimeout(() => game.lives.text = "Game Over: Refresh Your Browser to Play Again", 500);
+      } 
   }
 
-  if (player.facingRight) {
-    ctx.drawImage(
-      halleImage,
-      spriteX,
-      spriteY,
-      spriteWidth,
-      spriteHeight,
-      player.x - hitDx,
-      player.y - hitDy,
-      player.width,
-      player.height
-    );
-  } else {
-    //for running to the left you mirror the image
-    ctx.save();
-    ctx.scale(-1, 1); //mirror the entire canvas
-    ctx.drawImage(
-      halleImage,
-      spriteX,
-      spriteY,
-      spriteWidth,
-      spriteHeight,
-      -player.x - player.width + hitDx,
-      player.y - hitDy,
-      player.width,
-      player.height
-    );
-    ctx.restore(); //put the canvas back to normal
+  function collectDb(player, collectable) {
+      game.score.text = 'Score: ' + (parseInt(/\s+(\S*)$/.exec(game.score.text)[1], 10) + collectable.type.points);
+      collectable.kill();
   }
-}
 
-function collision() {
-  player.onGround = false; // Reset this every frame; if the player is actually on the ground, the resolveCollision function will set it to true
-  var result = undefined;
-  for (var i = 0; i < platforms.length; i++) {
-    // Check for collision
-    if (
-      player.x + hitBoxWidth > platforms[i].x &&
-      player.x < platforms[i].x + platforms[i].width &&
-      player.y < platforms[i].y + platforms[i].height &&
-      player.y + hitBoxHeight > platforms[i].y
-    ) {
-      //now that we know we have collided, we figure out the direction of collision
-      result = resolveCollision(
-        platforms[i].x,
-        platforms[i].y,
-        platforms[i].width,
-        platforms[i].height
-      );
-    }
-  }
-  return result;
-}
-
-function resolveCollision(objx, objy, objw, objh) {
-  //this is the return value
-  let collisionDirection = "";
-  //found here https://stackoverflow.com/questions/38648693/resolve-collision-of-two-2d-elements
-  //first we find the distance between the center of the object and the player
-  let dx = player.x + hitBoxWidth / 2 - (objx + objw / 2);
-  let dy = player.y + hitBoxHeight / 2 - (objy + objh / 2);
-
-  //get half-widths of each item
-  let halfWidth = hitBoxWidth / 2 + objw / 2;
-  let halfHeight = hitBoxHeight / 2 + objh / 2;
-
-  // if the x and y vector are less than the half width or half height,
-  // then we must be inside the object, causing a collision
-  let originx = halfWidth - Math.abs(dx);
-  let originy = halfHeight - Math.abs(dy);
-
+});
   if (debugVar) {
     //debug
     ctx.strokeStyle = "blue";
