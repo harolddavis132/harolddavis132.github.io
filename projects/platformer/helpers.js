@@ -109,7 +109,7 @@ $(document).ready(function () {
   }
 
   return collisionDirection;
-}
+
 
 function projectileCollision() {
   //checking if the player is dead
